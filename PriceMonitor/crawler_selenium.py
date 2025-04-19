@@ -236,34 +236,63 @@ class Crawler(object):
             url = 'https://item.jd.com/' + item_id + '.html'
             original_url = url  # 保存URL以便登录后返回
             
-            # 先尝试直接访问商品页面
             print(f"\n正在访问商品页面: {url}")
             self.chrome.get(url)
             time.sleep(2)
-            
-            # 检查是否需要登录
-            if not self.check_login_status():
-                print("需要登录")
-                if self.login():
-                    # 登录成功后，重新访问商品页面
-                    print(f"\n重新访问商品页面: {original_url}")
-                    self.chrome.get(original_url)
-                    time.sleep(2)
-                else:
-                    print("登录失败，继续尝试获取商品信息")
-            
-            # 确保页面加载到了正确的商品页面
-            retry_count = 0
-            while retry_count < 3 and (item_id not in self.chrome.current_url):
-                print(f"页面未正确加载（当前URL: {self.chrome.current_url}），第{retry_count + 1}次重试...")
-                self.chrome.get(url)
-                time.sleep(2 + retry_count)  # 每次重试增加等待时间
-                retry_count += 1
-            
-            if item_id not in self.chrome.current_url:
-                print("无法加载商品页面，可能是商品不存在")
-                return item_info_dict
-            
+            print(f"当前页面URL: {self.chrome.current_url}")
+            print(f"页面标题: {self.chrome.title}")
+            # 保存页面源码用于调试
+            with open(f"jd_item_{item_id}_debug.html", "w", encoding="utf-8") as f:
+                f.write(self.chrome.page_source)
+
+            # 检查是否跳转到登录页或首页
+            if "passport.jd.com" in self.chrome.current_url or "请登录" in self.chrome.page_source:
+                print("检测到跳转到登录页，未登录或cookies失效")
+                raise Exception("未登录或cookies失效")
+            if "www.jd.com" in self.chrome.current_url:
+                print("检测到跳转到京东首页，可能未通过反爬")
+                raise Exception("被重定向到首页，反爬机制触发")
+
+            # 优先选择主售价节点
+            main_price_xpaths = [
+                "//span[@class='price J-p-']",  # 典型主售价
+                "//span[@id='jd-price']",
+                "//div[contains(@class,'p-price')]//span[contains(@class,'price')]",
+                "//span[@class='p-price']/span",
+                "//span[contains(@class,'price') and not(contains(@class,'plus'))]"
+            ]
+            main_price = None
+            for xpath in main_price_xpaths:
+                price_eles = self.chrome.find_elements(By.XPATH, xpath)
+                if price_eles:
+                    for ele in price_eles:
+                        text = ele.text.strip().replace("￥", "").replace(",", "")
+                        if text and text.replace('.', '', 1).isdigit():
+                            main_price = text
+                            print(f"主售价节点 (xpath: {xpath})，内容: {ele.text}")
+                            break
+                if main_price:
+                    break
+
+            # 如果没找到主售价节点，降级打印所有价格相关元素内容
+            if not main_price:
+                price_spans = self.chrome.find_elements(By.XPATH, "//span[contains(@class,'price') or contains(@class,'p-price') or contains(@class,'jd-price') or contains(@class,'price J-p-') or @id='jd-price']")
+                print(f"共找到 {len(price_spans)} 个价格相关元素:")
+                for idx, ele in enumerate(price_spans):
+                    print(f"[{idx}] class: {ele.get_attribute('class')}, id: {ele.get_attribute('id')}, 文本: {ele.text}")
+                # 尝试取最大价格作为主售价（适用于多价格场景）
+                price_candidates = []
+                for ele in price_spans:
+                    text = ele.text.strip().replace("￥", "").replace(",", "")
+                    if text and text.replace('.', '', 1).isdigit():
+                        price_candidates.append(float(text))
+                if price_candidates:
+                    main_price = str(max(price_candidates))
+                    print(f"降级选择最大价格作为主售价: {main_price}")
+
+            # 继续后续逻辑，返回主售价
+            item_info_dict = {'name': '', 'price': main_price, 'plus_price': None, 'subtitle': None}
+
             # 等待商品信息加载
             try:
                 # 等待商品名称元素出现
@@ -308,34 +337,6 @@ class Crawler(object):
                     break
         except Exception as e:
             logging.warning('Crawl name failure: {}'.format(e))
-
-        # 提取商品价格
-        try:
-            selectors = [
-                "//span[@class='price']",
-                "//div[@class='p-price']/span[2]",
-                "//div[contains(@class, 'price-box')]//span[@class='price']",
-                "//strong[@class='J-p-10145225792900']",
-                "//span[@class='p-price']//span",
-                "//strong[@id='J_p-10145225792900']"
-            ]
-            
-            for selector in selectors:
-                element = self._find_element_safe(By.XPATH, selector)
-                if element:
-                    price = element.text
-                    print(f"找到价格元素，选择器：{selector}，内容：{price}")
-                    if price:
-                        price_xpath = re.findall(r'-?\d+\.?\d*e?-?\d*?', price)
-                        if price_xpath:
-                            item_info_dict['price'] = price_xpath[0]
-                            break
-                            
-            if not item_info_dict['price']:
-                print("未能找到价格信息，可能需要登录或页面结构已变化")
-                
-        except Exception as e:
-            logging.warning('Crawl price failure: {}'.format(e))
 
         # 提取商品PLUS价格
         try:
