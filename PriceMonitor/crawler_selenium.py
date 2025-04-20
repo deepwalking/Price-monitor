@@ -227,33 +227,38 @@ class Crawler(object):
         except NoSuchElementException:
             return None
             
-    def get_jd_item(self, item_id):
+    def get_jd_item(self, item):
+        """
+        item: 可以是商品ID（如 '100038005189'）或完整URL（如 'https://item.jd.com/100038005189.html'）
+        """
+        import re
         item_info_dict = {"name": None, "price": None, "plus_price": None, "subtitle": None}
-        original_url = None  # 保存登录前的商品URL
-        
+        original_url = None
+        # 彻底防止重复拼接
+        if isinstance(item, str) and item.strip().startswith("http"):
+            url = item.strip()
+            m = re.search(r'/item.jd.com/(\\d+).html', url)
+            item_id_for_debug = m.group(1) if m else "unknown"
+        else:
+            # 只允许数字作为商品ID，否则报错
+            if not (isinstance(item, str) and item.isdigit()):
+                raise ValueError(f"get_jd_item 参数异常，既不是url也不是纯数字ID: {item}")
+            item_id_for_debug = item
+            url = 'https://item.jd.com/' + str(item) + '.html'
         try:
-            # 构建商品URL
-            url = 'https://item.jd.com/' + item_id + '.html'
-            original_url = url  # 保存URL以便登录后返回
-            
+            original_url = url
             print(f"\n正在访问商品页面: {url}")
             self.chrome.get(url)
             time.sleep(2)
             print(f"当前页面URL: {self.chrome.current_url}")
             print(f"页面标题: {self.chrome.title}")
-            # 保存页面源码用于调试
-            with open(f"jd_item_{item_id}_debug.html", "w", encoding="utf-8") as f:
-                f.write(self.chrome.page_source)
-
-            # 检查是否跳转到登录页或首页
+            # 已去除保存页面源码到 debug.html 的调试代码
             if "passport.jd.com" in self.chrome.current_url or "请登录" in self.chrome.page_source:
                 print("检测到跳转到登录页，未登录或cookies失效")
                 raise Exception("未登录或cookies失效")
             if "www.jd.com" in self.chrome.current_url:
                 print("检测到跳转到京东首页，可能未通过反爬")
                 raise Exception("被重定向到首页，反爬机制触发")
-
-            # 优先选择主售价节点
             main_price_xpaths = [
                 "//span[@class='price J-p-']",  # 典型主售价
                 "//span[@id='jd-price']",
@@ -273,14 +278,11 @@ class Crawler(object):
                             break
                 if main_price:
                     break
-
-            # 如果没找到主售价节点，降级打印所有价格相关元素内容
             if not main_price:
                 price_spans = self.chrome.find_elements(By.XPATH, "//span[contains(@class,'price') or contains(@class,'p-price') or contains(@class,'jd-price') or contains(@class,'price J-p-') or @id='jd-price']")
                 print(f"共找到 {len(price_spans)} 个价格相关元素:")
                 for idx, ele in enumerate(price_spans):
                     print(f"[{idx}] class: {ele.get_attribute('class')}, id: {ele.get_attribute('id')}, 文本: {ele.text}")
-                # 尝试取最大价格作为主售价（适用于多价格场景）
                 price_candidates = []
                 for ele in price_spans:
                     text = ele.text.strip().replace("￥", "").replace(",", "")
@@ -289,36 +291,23 @@ class Crawler(object):
                 if price_candidates:
                     main_price = str(max(price_candidates))
                     print(f"降级选择最大价格作为主售价: {main_price}")
-
-            # 继续后续逻辑，返回主售价
             item_info_dict = {'name': '', 'price': main_price, 'plus_price': None, 'subtitle': None}
-
-            # 等待商品信息加载
             try:
-                # 等待商品名称元素出现
                 WebDriverWait(self.chrome, 10).until(
                     EC.presence_of_element_located((By.CLASS_NAME, "sku-name"))
                 )
-                
-                # 执行滚动以确保所有元素加载
                 self.chrome.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
                 time.sleep(1)
-                
-                # 获取商品信息
                 self._extract_item_info(item_info_dict)
-                
             except TimeoutException:
                 print("等待商品信息加载超时")
-            
         except Exception as e:
             logging.warning('Crawl failure: {}'.format(e))
             print(f"发生错误: {str(e)}")
         finally:
             if any(value is not None for value in item_info_dict.values()):
-                # 只有在成功获取到信息时才保存 cookies
                 self.save_cookies()
             logging.info('Crawl finished: {}'.format(item_info_dict))
-            
         return item_info_dict
 
     def _extract_item_info(self, item_info_dict):

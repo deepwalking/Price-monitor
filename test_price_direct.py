@@ -2,6 +2,8 @@ from PriceMonitor.crawler_selenium import Crawler
 import time
 import json
 import datetime
+import re
+import concurrent.futures
 
 
 def test_with_saved_cookies():
@@ -24,26 +26,34 @@ def test_with_saved_cookies():
 
 
 def test_with_saved_cookies_monitor():
-    """使用已保存的 cookies 持续监控商品价格，每分钟获取一次，失败或超6小时自动停止"""
-    crawler = Crawler()  # 获取或创建实例
-    item_id = "100038005189"  # 可替换为其他商品 ID
-    start_time = time.time()
-    max_seconds = 6 * 60 * 60  # 6小时
-    print(f"\n开始监控商品价格，最多持续6小时，每分钟采集一次...")
+    """使用已保存的 cookies 持续监控商品列表价格，每分钟获取一次，失败自动停止"""
+    import json
+    # 从配置文件读取商品详情页 url 列表
+    with open("monitor_items.json", "r", encoding="utf-8") as f:
+        config = json.load(f)
+        item_urls = config.get("items", [])
+        interval = config.get("interval", 60)
+    print(f"\n开始监控商品列表价格，每 {interval} 秒采集一次...")
+    crawler = Crawler()
     while True:
         now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        try:
-            item_info = crawler.get_jd_item(item_id)
-            print(f"[{now_str}] 商品价格: {item_info['price']} 元")
-        except Exception as e:
-            print(f"[{now_str}] 获取价格失败，程序停止: {e}")
-            return
-        # 检查是否超时
-        elapsed = time.time() - start_time
-        if elapsed >= max_seconds:
-            print(f"[{now_str}] 已持续运行6小时，监控结束。最后一次价格: {item_info['price']} 元")
-            return
-        time.sleep(60)
+        for url in item_urls:
+            try:
+                item_info = crawler.get_jd_item(url)
+                not_found = item_info['price'] is None
+                # 获取页面标题
+                if hasattr(crawler, 'chrome') and crawler.chrome:
+                    title = crawler.chrome.title if not_found else item_info.get('name') or crawler.chrome.title
+                else:
+                    title = '没有找到'
+                if not_found:
+                    title = '没有找到'
+                on_price_checked(url, item_info['price'], not_found, title)
+                print(f"[{now_str}] {url} 价格: {item_info['price']} 元")
+            except Exception as e:
+                print(f"[{now_str}] {url} 获取价格失败，跳过: {e}")
+                continue
+        time.sleep(interval)
 
 
 def wait_for_login():
@@ -101,25 +111,33 @@ def test_jd_price():
         print(f"发生错误: {e}")
 
 
+def on_price_checked(url, price, not_found, title):
+    """
+    价格检查回调。
+    url: 商品链接
+    price: 价格字符串或 None
+    not_found: bool，True 表示未找到价格，False 表示已找到价格
+    title: 页面标题，未找到价格时为 '没有找到'
+    """
+    if not_found:
+        print(f"[回调] {url} 未找到价格，页面标题: {title}")
+    else:
+        print(f"[回调] {url} 价格: {price} 元，页面标题: {title}")
+
+
 if __name__ == "__main__":
     print("欢迎使用京东商品信息获取工具")
     print("=" * 50)
     print("\n请选择操作：")
     print("1. 登录并保存新的 cookies")
     print("2. 使用已保存的 cookies 监控价格")
-    print("3. 使用已保存的 cookies 测试")
-    print("4. 测试获取商品价格")
-    print("5. 退出")
-    choice = input("\n请输入选项（1-5）: ")
+    print("3. 退出")
+    choice = input("\n请输入选项（1-3）: ")
     if choice == "1":
         if wait_for_login():
             print("\n现在测试使用新保存的 cookies...")
             test_with_saved_cookies_monitor()
     elif choice == "2":
         test_with_saved_cookies_monitor()
-    elif choice == "3":
-        test_with_saved_cookies()
-    elif choice == "4":
-        test_jd_price()
     else:
         print("\n操作已取消")
