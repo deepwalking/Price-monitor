@@ -9,19 +9,29 @@ import requests
 WECHAT_PAGE = "pages/index/index"  # 跳转页面，可按需修改
 
 def get_wechat_config():
+    """
+    读取 monitor_items.json 的 wechat 配置，根据 mode 选择订阅消息或模板消息参数。
+    返回 (appid, secret, template_id, openid, mode)
+    """
     try:
         with open("monitor_items.json", "r", encoding="utf-8") as f:
             config = json.load(f)
             wechat = config.get("wechat", {})
+            mode = wechat.get("mode", "subscribe")
+            if mode == "template":
+                sub = wechat.get("template_message", {})
+            else:
+                sub = wechat.get("subscribe_message", {})
             return (
-                wechat.get("appid", ""),
-                wechat.get("secret", ""),
-                wechat.get("template_id", ""),
-                wechat.get("openid", "")
+                sub.get("appid", ""),
+                sub.get("secret", ""),
+                sub.get("template_id", ""),
+                sub.get("openid", ""),
+                mode
             )
     except Exception as e:
         print(f"读取微信配置失败: {e}")
-        return ("", "", "", "")
+        return ("", "", "", "", "subscribe")
 
 def get_wechat_access_token(appid, secret):
     url = f"https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid={appid}&secret={secret}"
@@ -33,20 +43,33 @@ def get_wechat_access_token(appid, secret):
         print(f"获取微信 access_token 失败: {e}")
         return None
 
-def send_wechat_template_message(openid, template_id, page, data, access_token):
-    url = f"https://api.weixin.qq.com/cgi-bin/message/subscribe/send?access_token={access_token}"
-    payload = {
-        "touser": openid,
-        "template_id": template_id,
-        "page": page,
-        "data": data
-    }
+def send_wechat_message(openid, template_id, page, data, access_token, mode="subscribe"):
+    """
+    mode: "subscribe"(默认) 走订阅消息接口，"template"走模板消息接口
+    """
+    if mode == "template":
+        url = f"https://api.weixin.qq.com/cgi-bin/message/wxopen/template/send?access_token={access_token}"
+        payload = {
+            "touser": openid,
+            "template_id": template_id,
+            "page": page,
+            "form_id": "FORM_ID",  # 模板消息需要form_id，实际使用需传入
+            "data": data
+        }
+    else:
+        url = f"https://api.weixin.qq.com/cgi-bin/message/subscribe/send?access_token={access_token}"
+        payload = {
+            "touser": openid,
+            "template_id": template_id,
+            "page": page,
+            "data": data
+        }
     try:
         resp = requests.post(url, json=payload, timeout=5)
         resp.raise_for_status()
         return resp.json()
     except Exception as e:
-        print(f"发送微信模板消息失败: {e}")
+        print(f"发送微信消息失败: {e}")
         return None
 
 
@@ -163,7 +186,7 @@ def on_price_checked(url, price, not_found, title):
     not_found: bool，True 表示未找到价格，False 表示已找到价格
     title: 页面标题，未找到价格时为 '没有找到'
     """
-    WECHAT_APPID, WECHAT_SECRET, WECHAT_TEMPLATE_ID, WECHAT_OPENID = get_wechat_config()
+    WECHAT_APPID, WECHAT_SECRET, WECHAT_TEMPLATE_ID, WECHAT_OPENID, WECHAT_MODE = get_wechat_config()
     if not_found:
         print(f"[回调] {url} 未找到价格，页面标题: {title}")
         # 发送微信消息通知（价格未找到提醒）
@@ -175,12 +198,12 @@ def on_price_checked(url, price, not_found, title):
                 "thing2": {"value": "未找到价格"},
                 "thing3": {"value": url}
             }
-            result = send_wechat_template_message(
-                WECHAT_OPENID, WECHAT_TEMPLATE_ID, WECHAT_PAGE, data, access_token
+            result = send_wechat_message(
+                WECHAT_OPENID, WECHAT_TEMPLATE_ID, WECHAT_PAGE, data, access_token, WECHAT_MODE
             )
-            print(f"[微信模板消息] 未找到价格，发送结果: {result}")
+            print(f"[微信消息] 未找到价格，发送结果: {result}")
         else:
-            print("[微信模板消息] 获取 access_token 失败，未发送")
+            print("[微信消息] 获取 access_token 失败，未发送")
     else:
         print(f"[回调] {url} 价格: {price} 元，页面标题: {title}")
         # 发送微信消息通知（价格正常提醒）
@@ -192,12 +215,12 @@ def on_price_checked(url, price, not_found, title):
                 "amount2": {"value": str(price)},
                 "thing3": {"value": url}
             }
-            result = send_wechat_template_message(
-                WECHAT_OPENID, WECHAT_TEMPLATE_ID, WECHAT_PAGE, data, access_token
+            result = send_wechat_message(
+                WECHAT_OPENID, WECHAT_TEMPLATE_ID, WECHAT_PAGE, data, access_token, WECHAT_MODE
             )
-            print(f"[微信模板消息] 价格提醒，发送结果: {result}")
+            print(f"[微信消息] 价格提醒，发送结果: {result}")
         else:
-            print("[微信模板消息] 获取 access_token 失败，未发送")
+            print("[微信消息] 获取 access_token 失败，未发送")
 
 
 if __name__ == "__main__":

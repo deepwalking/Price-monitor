@@ -5,9 +5,18 @@
     ],
     "interval": 10,
     "wechat": {
-        "appid": "",
-        "secret": "",
-        "template_id": "",
-        "openid": ""
+        "subscribe_message": {
+            "appid": "wx1144b6f904e5b09d",
+            "secret": "532cd0a38dcb449722a2ce03e9a2593d",
+            "template_id": "IXq2FMJm0LHWpG7bzkX6hs1KwiidWq-vpY3NRPR5dKA",
+            "openid": ""
+        },
+        "template_message": {
+            "appid": "",
+            "secret": "",
+            "template_id": "",
+            "openid": ""
+        },
+        "mode": "subscribe"
     }
 }
