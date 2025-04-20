@@ -3,5 +3,11 @@
         "https://item.jd.com/100158036974.html",
         "https://item.jd.com/100158036975.html"
     ],
-    "interval": 10
+    "interval": 10,
+    "wechat": {
+        "appid": "",
+        "secret": "",
+        "template_id": "",
+        "openid": ""
+    }
 }
