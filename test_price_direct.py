@@ -38,7 +38,8 @@ def get_wechat_access_token(appid, secret):
     try:
         resp = requests.get(url, timeout=5)
         resp.raise_for_status()
-        return resp.json().get('access_token')
+        data = resp.json()
+        return data.get("access_token")
     except Exception as e:
         print(f"获取微信 access_token 失败: {e}")
         return None
@@ -72,6 +73,25 @@ def send_wechat_message(openid, template_id, page, data, access_token, mode="sub
         print(f"发送微信消息失败: {e}")
         return None
 
+# 新增：独立测试订阅消息推送的函数
+def send_test_wechat_subscribe_message():
+    WECHAT_APPID, WECHAT_SECRET, WECHAT_TEMPLATE_ID, WECHAT_OPENID, WECHAT_MODE = get_wechat_config()
+    if not all([WECHAT_APPID, WECHAT_SECRET, WECHAT_TEMPLATE_ID, WECHAT_OPENID]):
+        print("请确保 appid、secret、template_id、openid 均已正确填写！")
+        return
+    access_token = get_wechat_access_token(WECHAT_APPID, WECHAT_SECRET)
+    if not access_token:
+        print("获取 access_token 失败")
+        return
+    # 按你的新模板字段发送（thing1: 备忘标题, thing2: 备忘内容）
+    data = {
+        "thing1": {"value": "价格变化备忘"},
+        "thing2": {"value": "价格降至5799元"}  # 内容简化，避免超长和特殊字符
+    }
+    result = send_wechat_message(
+        WECHAT_OPENID, WECHAT_TEMPLATE_ID, WECHAT_PAGE, data, access_token, WECHAT_MODE
+    )
+    print(f"[微信订阅消息] 推送结果: {result}")
 
 def test_with_saved_cookies():
     """使用已保存的 cookies 测试商品价格获取"""
@@ -229,13 +249,16 @@ if __name__ == "__main__":
     print("\n请选择操作：")
     print("1. 登录并保存新的 cookies")
     print("2. 使用已保存的 cookies 监控价格")
-    print("3. 退出")
-    choice = input("\n请输入选项（1-3）: ")
+    print("3. 测试订阅消息推送")
+    print("4. 退出")
+    choice = input("\n请输入选项（1-4）: ")
     if choice == "1":
         if wait_for_login():
             print("\n现在测试使用新保存的 cookies...")
             test_with_saved_cookies_monitor()
     elif choice == "2":
         test_with_saved_cookies_monitor()
+    elif choice == "3":
+        send_test_wechat_subscribe_message()
     else:
         print("\n操作已取消")

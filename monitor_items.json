@@ -6,10 +6,10 @@
     "interval": 10,
     "wechat": {
         "subscribe_message": {
-            "appid": "wx1144b6f904e5b09d",
-            "secret": "532cd0a38dcb449722a2ce03e9a2593d",
-            "template_id": "IXq2FMJm0LHWpG7bzkX6hs1KwiidWq-vpY3NRPR5dKA",
-            "openid": ""
+            "appid": "wxd5ed24e18ac42ccf",
+            "secret": "61b66025b261df6b2979c7394818b15f",
+            "template_id": "jNrMaAZ2jPZjNTrhJcMggljo_GDlPTIu_QrN3gBs0Wg",
+            "openid": "oQhuq7dI2WGeZ5hA0lkg5qDN0jnk"
         },
         "template_message": {
             "appid": "",
