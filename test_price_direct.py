@@ -12,6 +12,9 @@ def monitor():
     # 创建一个新的爬虫实例，但不加载cookies
     crawler = Crawler(skip_cookies=True)
     
+    # 用于存储每个商品的上次价格，用于检测价格变化
+    last_prices = {}
+    
     cookie_file = "jd_pc_cookies.pkl"
     
     # 检查cookie文件是否存在
@@ -88,10 +91,40 @@ def monitor():
                 item_info = crawler.get_jd_item(url)
                 price = item_info['price']
                 title = item_info['name']
-                
+                has_coupon = item_info['has_coupon']
                 if price:
-                    send_price_change_notice(url, price, False, title)
+                    # 检查是否有价格变化
+
+                    # 如果商品之前已经监控过（非第一次）
+                    if url in last_prices:
+                        # 如果价格发生了变化
+                        if last_prices[url] != price:
+                            # 创建价格变化状态信息
+                            old_price = last_prices[url]
+                            new_price = price
+                            
+                            # 比较价格变化方向
+                            if float(new_price) > float(old_price):
+                                change_direction = "上涨"
+                            else:
+                                change_direction = "下降"
+                                
+                            # 格式化status信息
+                            status = f"{change_direction}，原价格：{old_price}"
+                            
+                            print(f"价格变化！{url} 价格从 {old_price} 变为 {new_price}，{status}")
+                            send_price_change_notice(url, price, title, status)
+                    else:
+                        # 第一次检测也发送通知，状态为"初始化"
+                        status = f"初始采集价格：{price}"
+                        print(f"首次监控 {url}，价格: {price} 元，{status}")
+                        send_price_change_notice(url, price, title, status)
+                    
+                    # 更新最后检测到的价格
+                    last_prices[url] = price
                 else:
+                    now = datetime.datetime.now()
+                    now_str = now.strftime("%Y-%m-%d %H:%M:%S")
                     print(f"[{now_str}] {url} 未找到价格")
             except Exception as e:
                 now = datetime.datetime.now()
@@ -141,31 +174,63 @@ def wait_for_login():
         return False
 
 
-def send_price_change_notice(url, price, not_found, title):
-    """
-    价格检查回调。
-    url: 商品链接
-    price: 价格字符串或 None
-    not_found: bool，True 表示未找到价格，False 表示已找到价格
-    title: 页面标题，未找到价格时为 '没有找到'
-    """
-    if not_found:
-        print(f"[回调] {url} 未找到价格，页面标题: {title}")
-    else:
-        print(f"[回调] {url} 价格: {price} 元，页面标题: {title}")
+def send_price_change_notice(url, price, title, status):
+    try:
+        import re
+        match = re.search(r'/(\d+)\.html', url)
+        if not match:
+            print(f"无法从URL中提取商品ID: {url}")
+            return
+            
+        product_id = match.group(1)
+        
+        title_short = title[:20]
+        
+        payload = {
+            "price": price,
+            "id": product_id,
+            "title": title_short,
+            "status": status
+        }
+        
+        print(f"发送价格变化通知: {payload}")
+        
+        import requests
+        api_url = "https://api.azzjia.com/common/SendJdPriceChangeNotice"
+        response = requests.post(api_url, json=payload, timeout=5)
+        print(f"价格变化通知发送结果: {response.status_code}")
+            
+    except Exception as e:
+        print(f"处理价格变化通知时出错: {e}")
 
-def call_rpc2(url, price, not_found, title):
-    """
-    价格检查回调。
-    url: 商品链接
-    price: 价格字符串或 None
-    not_found: bool，True 表示未找到价格，False 表示已找到价格
-    title: 页面标题，未找到价格时为 '没有找到'
-    """
-    if not_found:
-        print(f"[回调] {url} 未找到价格，页面标题: {title}")
-    else:
-        print(f"[回调] {url} 价格: {price} 元，页面标题: {title}")
+
+def send_jd_coupon_notice(url, title):
+    try:
+        import re
+        match = re.search(r'/(\d+)\.html', url)
+        if not match:
+            print(f"无法从URL中提取商品ID: {url}")
+            return
+            
+        product_id = match.group(1)
+        
+        title_short = title[:40]
+        
+        payload = {
+            "id": product_id,
+            "title": title_short,
+        }
+        
+        print(f"发送优惠券变化通知: {payload}")
+        
+        import requests
+        api_url = "https://api.azzjia.com/common/SendJdCouponNotice"
+        response = requests.post(api_url, json=payload, timeout=5)
+        print(f"发送优惠券通知发送结果: {response.status_code}")
+            
+    except Exception as e:
+        print(f"处理优惠券变化通知时出错: {e}")
+
 
 if __name__ == "__main__":
     crawler = None
