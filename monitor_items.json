@@ -1,22 +1,8 @@
 {
     "items": [
         "https://item.jd.com/100158036974.html",
-        "https://item.jd.com/100158036975.html"
+        "https://item.jd.com/100158036975.html",
+        "https://item.jd.com/100140657580.html"
     ],
-    "interval": 10,
-    "wechat": {
-        "subscribe_message": {
-            "appid": "wxd5ed24e18ac42ccf",
-            "secret": "61b66025b261df6b2979c7394818b15f",
-            "template_id": "jNrMaAZ2jPZjNTrhJcMggljo_GDlPTIu_QrN3gBs0Wg",
-            "openid": "oQhuq7dI2WGeZ5hA0lkg5qDN0jnk"
-        },
-        "template_message": {
-            "appid": "",
-            "secret": "",
-            "template_id": "",
-            "openid": ""
-        },
-        "mode": "subscribe"
-    }
+    "interval": 10
 }

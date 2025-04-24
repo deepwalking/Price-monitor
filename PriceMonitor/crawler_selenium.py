@@ -26,7 +26,7 @@ class Crawler(object):
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, proxy=None):
+    def __init__(self, proxy=None, skip_cookies=False, cookies_file=None):
         # 如果已经初始化过，直接返回
         if self._chrome is not None:
             return
@@ -92,9 +92,12 @@ class Crawler(object):
         self._chrome.set_script_timeout(20)
         self._chrome.implicitly_wait(5)
         
-        # 尝试加载已保存的 cookies
-        self.cookies_file = 'jd_cookies.pkl'
-        self.load_cookies()
+        # 设置cookies文件
+        self.cookies_file = cookies_file or 'jd_cookies.pkl'
+        
+        # 如果没有跳过加载cookies，则尝试加载
+        if not skip_cookies:
+            self.load_cookies()
 
     @property
     def chrome(self):
@@ -115,12 +118,13 @@ class Crawler(object):
         """析构函数，确保浏览器被关闭"""
         self.quit()
 
-    def save_cookies(self):
+    def save_cookies(self, cookies_file=None):
         """保存 cookies 到文件"""
         try:
             cookies = self.chrome.get_cookies()
+            target_file = cookies_file or self.cookies_file
             if cookies:
-                with open(self.cookies_file, 'wb') as f:
+                with open(target_file, 'wb') as f:
                     pickle.dump(cookies, f)
                     print("Cookies 已保存")
                 return True
@@ -128,11 +132,12 @@ class Crawler(object):
             print(f"保存 cookies 失败: {e}")
         return False
 
-    def load_cookies(self):
+    def load_cookies(self, cookies_file=None):
         """从文件加载 cookies"""
         try:
-            if os.path.exists(self.cookies_file):
-                with open(self.cookies_file, 'rb') as f:
+            target_file = cookies_file or self.cookies_file
+            if os.path.exists(target_file):
+                with open(target_file, 'rb') as f:
                     cookies = pickle.load(f)
                     if cookies:
                         # 先访问一下京东主页，这样才能添加 cookies
@@ -143,27 +148,25 @@ class Crawler(object):
                         for cookie in cookies:
                             try:
                                 # 确保 cookie 有效
-                                if 'expiry' in cookie:
-                                    # 转换为整数
-                                    cookie['expiry'] = int(cookie['expiry'])
+                                if 'expiry' in cookie and cookie['expiry'] < time.time():
+                                    continue
                                 self.chrome.add_cookie(cookie)
                             except Exception as e:
-                                print(f"添加单个 cookie 失败: {e}")
+                                print(f"添加单个cookie时出错: {e}")
                                 continue
                         
-                        print("Cookies 已加载")
                         # 刷新页面以应用 cookies
                         self.chrome.refresh()
                         time.sleep(1)
                         
                         # 验证登录状态
                         if self.check_login_status():
-                            print("Cookies 有效，已成功登录")
+                            print(f"Cookies 从 {target_file} 加载成功，已成功登录")
                             return True
                         else:
-                            print("Cookies 已失效")
+                            print(f"Cookies 从 {target_file} 加载失败，已失效")
                             # 删除失效的 cookies 文件
-                            os.remove(self.cookies_file)
+                            os.remove(target_file)
         except Exception as e:
             print(f"加载 cookies 失败: {e}")
         return False
