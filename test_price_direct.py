@@ -90,7 +90,7 @@ def monitor():
                 title = item_info['name']
                 
                 if price:
-                    call_rpc(url, price, False, title)
+                    send_price_change_notice(url, price, False, title)
                 else:
                     print(f"[{now_str}] {url} 未找到价格")
             except Exception as e:
@@ -141,7 +141,7 @@ def wait_for_login():
         return False
 
 
-def call_rpc(url, price, not_found, title):
+def send_price_change_notice(url, price, not_found, title):
     """
     价格检查回调。
     url: 商品链接
@@ -154,6 +154,18 @@ def call_rpc(url, price, not_found, title):
     else:
         print(f"[回调] {url} 价格: {price} 元，页面标题: {title}")
 
+def call_rpc2(url, price, not_found, title):
+    """
+    价格检查回调。
+    url: 商品链接
+    price: 价格字符串或 None
+    not_found: bool，True 表示未找到价格，False 表示已找到价格
+    title: 页面标题，未找到价格时为 '没有找到'
+    """
+    if not_found:
+        print(f"[回调] {url} 未找到价格，页面标题: {title}")
+    else:
+        print(f"[回调] {url} 价格: {price} 元，页面标题: {title}")
 
 if __name__ == "__main__":
     crawler = None
