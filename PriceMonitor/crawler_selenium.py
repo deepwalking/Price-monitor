@@ -248,7 +248,7 @@ class Crawler(object):
         item: 可以是商品ID（如 '100038005189'）或完整URL（如 'https://item.jd.com/100038005189.html'）
         """
         import re
-        item_info_dict = {"name": None, "price": None, "plus_price": None, "subtitle": None}
+        item_info_dict = {"name": None, "price": None, "plus_price": None, "subtitle": None, "has_coupon": None}
         original_url = None
         # 彻底防止重复拼接
         if isinstance(item, str) and item.strip().startswith("http"):
@@ -268,6 +268,7 @@ class Crawler(object):
             time.sleep(2)
             print(f"当前页面URL: {self.chrome.current_url}")
             print(f"页面标题: {self.chrome.title}")
+            
             # 已去除保存页面源码到 debug.html 的调试代码
             if "passport.jd.com" in self.chrome.current_url or "请登录" in self.chrome.page_source:
                 print("检测到跳转到登录页，未登录或cookies失效")
@@ -275,6 +276,10 @@ class Crawler(object):
             if "www.jd.com" in self.chrome.current_url:
                 print("检测到跳转到京东首页，可能未通过反爬")
                 raise Exception("被重定向到首页，反爬机制触发")
+            
+            # 直接检查是否有优惠券并打印结果（第一次检查）
+            print("\n--- 检查优惠券状态（点击前） ---")
+            self.check_has_coupon()
             
             # 在获取价格之前尝试点击"更多"按钮
             print("\n尝试点击'更多'按钮展开优惠信息...")
@@ -322,10 +327,10 @@ class Crawler(object):
                 time.sleep(1)
                 self._extract_item_info(item_info_dict)
                 
-                # 点击"更多"按钮测试
-                print("\n开始尝试点击'更多'按钮...")
-                self._click_more_button()
-                print("点击'更多'按钮测试完成")
+                # 价格找到后，再次检查是否有优惠券（以防点击"更多"按钮后有变化）
+                print("\n--- 检查优惠券状态（价格获取后） ---")
+                item_info_dict['has_coupon'] = self.check_has_coupon()
+                
             except TimeoutException:
                 print("等待商品信息加载超时")
         except Exception as e:
@@ -389,104 +394,32 @@ class Crawler(object):
     def _click_more_button(self):
         """尝试点击页面上的'更多'按钮，弹出右侧界面"""
         try:
-            print("开始尝试点击按钮以弹出右侧界面")
-            # 方法一：使用精确的CSS选择器查找more-btn元素
-            try:
-                print("方法一：尝试使用精确的 CSS 选择器 'span.more-btn'")
-                more_btn = self.chrome.find_element(By.CSS_SELECTOR, "span.more-btn")
-                
-                # 输出按钮属性信息便于调试
-                btn_info = {
-                    "tag_name": more_btn.tag_name,
-                    "text": more_btn.text,
-                    "location": more_btn.location,
-                    "is_displayed": more_btn.is_displayed(),
-                    "is_enabled": more_btn.is_enabled()
-                }
-                print(f"找到按钮信息: {btn_info}")
-                
-                # 如果找到了元素并且可见，使用JavaScript点击它
-                if more_btn.is_displayed():
-                    print("按钮可见，正在点击...")
-                    self.chrome.execute_script("arguments[0].click();", more_btn)
-                    print("已执行点击操作")
-                    time.sleep(1)  # 等待弹出层显示
-                    print("点击操作后等待1秒完成")
-                else:
-                    print("找到了按钮，但按钮不可见")
-            except Exception as e1:
-                print(f"方法一失败: {e1}")
-                
-                # 方法二：尝试更宽泛的查找方式
-                try:
-                    print("方法二：尝试使用宽泛选择器 '[class*=more-btn], [class*=J-trigger]'")
-                    # 查找所有可能的按钮
-                    all_btns = self.chrome.find_elements(By.CSS_SELECTOR, "[class*=more-btn], [class*=J-trigger]")
-                    print(f"找到 {len(all_btns)} 个可能的按钮")
-                    
-                    clicked = False
-                    for i, btn in enumerate(all_btns):
-                        try:
-                            # 输出每个按钮的信息
-                            btn_info = {
-                                "索引": i,
-                                "tag_name": btn.tag_name,
-                                "text": btn.text,
-                                "class": btn.get_attribute("class"),
-                                "location": btn.location,
-                                "is_displayed": btn.is_displayed(),
-                                "is_enabled": btn.is_enabled()
-                            }
-                            print(f"按钮 {i} 信息: {btn_info}")
-                            
-                            if btn.is_displayed():
-                                print(f"按钮 {i} 可见，尝试点击...")
-                                self.chrome.execute_script("arguments[0].click();", btn)
-                                print(f"已执行点击按钮 {i}")
-                                time.sleep(1)
-                                clicked = True
-                                print(f"成功点击按钮 {i}")
-                                break
-                        except Exception as btn_err:
-                            print(f"点击按钮 {i} 时出错: {btn_err}")
-                    
-                    if not clicked:
-                        print("未找到可点击的按钮")
-                except Exception as e2:
-                    print(f"方法二失败: {e2}")
-                    
-                    # 方法三：直接通过XPath定位
-                    try:
-                        print("方法三：尝试使用XPath '//span[contains(@class, \"more\")]'")
-                        more_spans = self.chrome.find_elements(By.XPATH, '//span[contains(@class, "more")]')
-                        print(f"通过XPath找到 {len(more_spans)} 个元素")
-                        
-                        for i, span in enumerate(more_spans):
-                            try:
-                                span_info = {
-                                    "索引": i,
-                                    "text": span.text,
-                                    "class": span.get_attribute("class"),
-                                    "is_displayed": span.is_displayed()
-                                }
-                                print(f"Span {i} 信息: {span_info}")
-                                
-                                if span.is_displayed():
-                                    print(f"尝试点击Span {i}...")
-                                    self.chrome.execute_script("arguments[0].click();", span)
-                                    time.sleep(1)
-                                    print(f"已点击Span {i}")
-                                    break
-                            except Exception as span_err:
-                                print(f"点击Span {i} 时出错: {span_err}")
-                    except Exception as e3:
-                        print(f"方法三失败: {e3}")
+            # 使用精确的CSS选择器查找more-btn元素
+            more_btn = self.chrome.find_element(By.CSS_SELECTOR, "span.more-btn")
             
-            # 点击操作结束后记录信息
-            print("点击操作尝试结束")
-            
+            # 如果找到了元素并且可见，使用JavaScript点击它
+            if more_btn.is_displayed():
+                self.chrome.execute_script("arguments[0].click();", more_btn)
+                time.sleep(1)  # 等待弹出层显示
         except Exception as e:
-            print(f"点击操作过程中发生未预期错误: {e}")
+            logging.debug(f"点击'更多'按钮失败: {e}")
+            
+    def check_has_coupon(self):
+        """检查页面是否有优惠券"""
+        try:
+            # 首先检查页面文本中是否直接包含"优惠券"
+            page_text = self.chrome.find_element(By.TAG_NAME, 'body').text
+            has_coupon = "优惠券" in page_text
+            
+            if has_coupon:
+                print("【检测到优惠券】此商品有优惠券可用！！！")
+            else:
+                print("【未检测到优惠券】此商品暂无优惠券")
+                
+            return has_coupon
+        except Exception as e:
+            print(f"检查优惠券时出错: {e}")
+            return False
 
     def get_huihui_item(self, item_id):
         huihui_info_dict = {"max_price": None, "min_price": None}
