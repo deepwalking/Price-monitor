@@ -15,6 +15,9 @@ def monitor():
     # 用于存储每个商品的上次价格，用于检测价格变化
     last_prices = {}
     
+    # 用于存储每个商品的上次优惠券状态，用于检测优惠券变化
+    last_coupon_status = {}
+    
     cookie_file = "jd_pc_cookies.pkl"
     
     # 检查cookie文件是否存在
@@ -92,6 +95,15 @@ def monitor():
                 price = item_info['price']
                 title = item_info['name']
                 has_coupon = item_info['has_coupon']
+                
+                if has_coupon:
+                    # 检查优惠券状态变化
+                    if url not in last_coupon_status:
+                        print(f"优惠券变化！{url} 新增优惠券")
+                        send_jd_coupon_notice(url, title)
+                        # 更新优惠券状态（None会被视为False）
+                        last_coupon_status[url] = bool(has_coupon)
+
                 if price:
                     # 检查是否有价格变化
 
@@ -214,7 +226,7 @@ def send_jd_coupon_notice(url, title):
             
         product_id = match.group(1)
         
-        title_short = title[:40]
+        title_short = title[:20]
         
         payload = {
             "id": product_id,
