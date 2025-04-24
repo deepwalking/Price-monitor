@@ -139,7 +139,6 @@ class Crawler(object):
             if cookies:
                 with open(target_file, 'wb') as f:
                     pickle.dump(cookies, f)
-                    print("Cookies 已保存")
                 return True
         except Exception as e:
             print(f"保存 cookies 失败: {e}")
@@ -263,10 +262,9 @@ class Crawler(object):
             url = 'https://item.jd.com/' + str(item) + '.html'
         try:
             original_url = url
-            print(f"\n正在访问商品页面: {url}")
             self.chrome.get(url)
             time.sleep(2)
-            print(f"当前页面URL: {self.chrome.current_url}")
+            # 只保留页面标题的输出，移除URL显示
             print(f"页面标题: {self.chrome.title}")
             
             # 已去除保存页面源码到 debug.html 的调试代码
@@ -277,9 +275,7 @@ class Crawler(object):
                 print("检测到跳转到京东首页，可能未通过反爬")
                 raise Exception("被重定向到首页，反爬机制触发")
             
-            # 直接检查是否有优惠券并打印结果（第一次检查）
-            print("\n--- 检查优惠券状态（点击前） ---")
-            self.check_has_coupon()
+            # 移除点击前的优惠券检查
             
             # 在获取价格之前尝试点击"更多"按钮
             print("\n尝试点击'更多'按钮展开优惠信息...")
@@ -339,7 +335,7 @@ class Crawler(object):
         finally:
             if any(value is not None for value in item_info_dict.values()):
                 self.save_cookies()
-            logging.info('Crawl finished: {}'.format(item_info_dict))
+            logging.info('Crawl finished')
         return item_info_dict
 
     def _extract_item_info(self, item_info_dict):
@@ -407,9 +403,28 @@ class Crawler(object):
     def check_has_coupon(self):
         """检查页面是否有优惠券"""
         try:
-            # 首先检查页面文本中是否直接包含"优惠券"
-            page_text = self.chrome.find_element(By.TAG_NAME, 'body').text
-            has_coupon = "优惠券" in page_text
+            # 使用更精确的选择器来查找优惠券区域
+            coupon_elements = self.chrome.find_elements(By.CSS_SELECTOR, "div.J-coupon,div.coupon-cont,.quan-item")
+            
+            # 检查是否在主要的价格区域附近找到优惠券信息
+            price_area = self.chrome.find_elements(By.CSS_SELECTOR, "div.summary-price-wrap")
+            price_area_text = ""
+            if price_area:
+                price_area_text = price_area[0].text
+                
+            # 检查是否在促销区域找到优惠券信息
+            promotion_area = self.chrome.find_elements(By.CSS_SELECTOR, "div.summary-promotion")
+            promotion_area_text = ""
+            if promotion_area:
+                promotion_area_text = promotion_area[0].text
+            
+            # 通过多种方式判断是否真的有优惠券
+            has_coupon = (
+                len(coupon_elements) > 0 or 
+                "优惠券" in price_area_text or 
+                "券" in price_area_text or
+                "优惠券" in promotion_area_text
+            )
             
             if has_coupon:
                 print("【检测到优惠券】此商品有优惠券可用！！！")

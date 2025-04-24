@@ -7,7 +7,7 @@ import concurrent.futures
 import os
 import pickle
 
-def test_with_saved_cookies_monitor():
+def monitor():
     """使用已保存的 cookies 持续监控商品列表价格，每分钟获取一次，失败自动停止"""
     # 创建一个新的爬虫实例，但不加载cookies
     crawler = Crawler(skip_cookies=True)
@@ -26,7 +26,6 @@ def test_with_saved_cookies_monitor():
         with open(cookie_file, 'rb') as f:
             cookies = pickle.load(f)
             if cookies:
-                print(f"成功读取 {len(cookies)} 个cookie")
                 all_cookies.extend(cookies)
             else:
                 print("cookie文件存在但没有内容")
@@ -40,26 +39,19 @@ def test_with_saved_cookies_monitor():
         crawler.quit()
         return False
     
-    print(f"\n总共读取了 {len(all_cookies)} 个cookie，现在开始应用...")
-    
     # 先访问京东主页
     crawler.chrome.get('https://www.jd.com')
     time.sleep(1)
     
     # 添加所有cookie
-    cookie_count = 0
     for cookie in all_cookies:
         try:
             # 确保cookie有效
             if 'expiry' in cookie and cookie['expiry'] < time.time():
                 continue
             crawler.chrome.add_cookie(cookie)
-            cookie_count += 1
         except Exception as e:
-            print(f"添加cookie失败: {e}")
             continue
-    
-    print(f"成功添加了 {cookie_count} 个cookie")
     
     # 刷新页面以应用cookies
     crawler.chrome.refresh()
@@ -92,21 +84,14 @@ def test_with_saved_cookies_monitor():
     while True:
         for url in items:
             try:
-                print(f"\n正在访问商品页面: {url}")
+                print(f"\n正在访问商品: {url}")
                 item_info = crawler.get_jd_item(url)
-                print(f"当前页面URL: {url}")
                 price = item_info['price']
                 title = item_info['name']
                 
                 if price:
-                    on_price_checked(url, price, False, title)
-                    now = datetime.datetime.now()
-                    now_str = now.strftime("%Y-%m-%d %H:%M:%S")
-                    print(f"[{now_str}] {url} 价格: {price} 元")
+                    call_rpc(url, price, False, title)
                 else:
-                    on_price_checked(url, None, True, title or "没有找到")
-                    now = datetime.datetime.now()
-                    now_str = now.strftime("%Y-%m-%d %H:%M:%S")
                     print(f"[{now_str}] {url} 未找到价格")
             except Exception as e:
                 now = datetime.datetime.now()
@@ -156,25 +141,7 @@ def wait_for_login():
         return False
 
 
-def test_jd_price():
-    """测试获取商品价格"""
-    crawler = Crawler()  # 获取或创建实例
-    # 测试商品 ID
-    item_id = "100038005189"  # 可以替换为其他商品 ID
-    try:
-        # 获取商品信息
-        item_info = crawler.get_jd_item(item_id)
-        print("\n商品信息：")
-        print(f"名称: {item_info['name']}")
-        print(f"价格: {item_info['price']}")
-        print(f"PLUS价格: {item_info['plus_price']}")
-        print(f"副标题: {item_info['subtitle']}")
-        
-    except Exception as e:
-        print(f"发生错误: {e}")
-
-
-def on_price_checked(url, price, not_found, title):
+def call_rpc(url, price, not_found, title):
     """
     价格检查回调。
     url: 商品链接
@@ -210,7 +177,7 @@ if __name__ == "__main__":
                 
             elif choice == "2":
                 try:
-                    test_with_saved_cookies_monitor()
+                    monitor()
                 except KeyboardInterrupt:
                     print("\n监控被用户中断")
                 except Exception as e:
