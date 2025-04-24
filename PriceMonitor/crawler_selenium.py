@@ -27,7 +27,6 @@ class Crawler(object):
         return cls._instance
 
     def __init__(self, proxy=None, skip_cookies=False, cookies_file=None):
-        # 如果已经初始化过，直接返回
         if self._chrome is not None:
             return
             
@@ -60,7 +59,21 @@ class Crawler(object):
             chrome_options.add_argument('--proxy-server=%s' % proxy_address)
             logging.info('Chrome using proxy: %s', proxy['https'])
         
-        service = Service('/usr/local/bin/chromedriver')
+        # 从配置文件中获取chromedriver路径
+        chromedriver_path = '/usr/local/bin/chromedriver'  # 默认路径
+        try:
+            config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'monitor_items.json')
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    if 'chromedriver_path' in config:
+                        chromedriver_path = config['chromedriver_path']
+                        print(f"从配置文件加载ChromeDriver路径: {chromedriver_path}")
+        except Exception as e:
+            logging.warning(f"读取配置文件中的ChromeDriver路径失败: {e}")
+            print(f"读取配置文件中的ChromeDriver路径失败: {e}")
+        
+        service = Service(chromedriver_path)
         self._chrome = webdriver.Chrome(service=service, options=chrome_options)
         
         # 执行 JavaScript 来修改 WebDriver 特征

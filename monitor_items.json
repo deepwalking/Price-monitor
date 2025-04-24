@@ -4,5 +4,6 @@
         "https://item.jd.com/100158036975.html",
         "https://item.jd.com/100140657580.html"
     ],
-    "interval": 10
+    "interval": 10,
+    "chromedriver_path": "/usr/local/bin/chromedriver"
 }
