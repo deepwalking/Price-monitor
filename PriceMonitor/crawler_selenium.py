@@ -275,8 +275,6 @@ class Crawler(object):
                 print("检测到跳转到京东首页，可能未通过反爬")
                 raise Exception("被重定向到首页，反爬机制触发")
             
-            # 移除点击前的优惠券检查
-            
             # 在获取价格之前尝试点击"更多"按钮
             print("\n尝试点击'更多'按钮展开优惠信息...")
             self._click_more_button()

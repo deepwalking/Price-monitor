@@ -95,14 +95,17 @@ def monitor():
                 price = item_info['price']
                 title = item_info['name']
                 has_coupon = item_info['has_coupon']
+                coupon_detail_list = item_info['coupon_detail_list']
                 
                 if has_coupon:
-                    # 检查优惠券状态变化
-                    if url not in last_coupon_status:
-                        print(f"优惠券变化！{url}")
+                    # 检查优惠券状态变化（新增或内容变化才推送）
+                    if (url not in last_coupon_status or
+                        last_coupon_status[url]['coupon_detail_list'] != coupon_detail_list):
                         send_jd_coupon_notice(url, title)
-                        # 更新优惠券状态（None会被视为False）
-                        last_coupon_status[url] = bool(has_coupon)
+                        last_coupon_status[url] = {
+                            'has_coupon': has_coupon,
+                            'coupon_detail_list': coupon_detail_list
+                        }
 
                 if price:
                     # 检查是否有价格变化
