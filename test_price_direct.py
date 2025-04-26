@@ -99,7 +99,7 @@ def monitor():
                 if has_coupon:
                     # 检查优惠券状态变化
                     if url not in last_coupon_status:
-                        print(f"优惠券变化！{url} 新增优惠券")
+                        print(f"优惠券变化！{url}")
                         send_jd_coupon_notice(url, title)
                         # 更新优惠券状态（None会被视为False）
                         last_coupon_status[url] = bool(has_coupon)

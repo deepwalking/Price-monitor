@@ -247,7 +247,7 @@ class Crawler(object):
         item: 可以是商品ID（如 '100038005189'）或完整URL（如 'https://item.jd.com/100038005189.html'）
         """
         import re
-        item_info_dict = {"name": None, "price": None, "plus_price": None, "subtitle": None, "has_coupon": None}
+        item_info_dict = {"name": None, "price": None, "plus_price": None, "subtitle": None, "has_coupon": None, "coupon_detail_list": None}
         original_url = None
         # 彻底防止重复拼接
         if isinstance(item, str) and item.strip().startswith("http"):
@@ -325,7 +325,10 @@ class Crawler(object):
                 
                 # 价格找到后，再次检查是否有优惠券（以防点击"更多"按钮后有变化）
                 print("\n--- 检查优惠券状态（价格获取后） ---")
-                item_info_dict['has_coupon'] = self.check_has_coupon()
+                item_info_dict['has_coupon'], coupon_detail_list = self.check_has_coupon()
+                item_info_dict['coupon_detail_list'] = coupon_detail_list
+                if item_info_dict['has_coupon']:
+                    print(f"优惠券详细信息：{coupon_detail_list}")
                 
             except TimeoutException:
                 print("等待商品信息加载超时")
@@ -401,40 +404,38 @@ class Crawler(object):
             logging.debug(f"点击'更多'按钮失败: {e}")
             
     def check_has_coupon(self):
-        """检查页面是否有优惠券"""
+        """仅根据新版京东优惠券区域判断并提取所有优惠券信息"""
         try:
-            # 使用更精确的选择器来查找优惠券区域
-            coupon_elements = self.chrome.find_elements(By.CSS_SELECTOR, "div.J-coupon,div.coupon-cont,.quan-item")
-            
-            # 检查是否在主要的价格区域附近找到优惠券信息
-            price_area = self.chrome.find_elements(By.CSS_SELECTOR, "div.summary-price-wrap")
-            price_area_text = ""
-            if price_area:
-                price_area_text = price_area[0].text
-                
-            # 检查是否在促销区域找到优惠券信息
-            promotion_area = self.chrome.find_elements(By.CSS_SELECTOR, "div.summary-promotion")
-            promotion_area_text = ""
-            if promotion_area:
-                promotion_area_text = promotion_area[0].text
-            
-            # 通过多种方式判断是否真的有优惠券
-            has_coupon = (
-                len(coupon_elements) > 0 or 
-                "优惠券" in price_area_text or 
-                "券" in price_area_text or
-                "优惠券" in promotion_area_text
-            )
-            
-            if has_coupon:
+            coupon_detail_list = []
+            coupons_box = self.chrome.find_elements(By.CSS_SELECTOR, "div.coupons-list-box")
+            if coupons_box:
+                coupon_quans = coupons_box[0].find_elements(By.CSS_SELECTOR, ".coupon-quan")
+                for cq in coupon_quans:
+                    try:
+                        price = cq.find_element(By.CSS_SELECTOR, ".coupon-quan-left-price").text.strip()
+                    except Exception:
+                        price = ""
+                    try:
+                        condition = cq.find_element(By.CSS_SELECTOR, ".coupon-quan-right-price").text.strip()
+                    except Exception:
+                        condition = ""
+                    try:
+                        expire = cq.find_element(By.CSS_SELECTOR, ".coupon-quan-right-font").text.strip()
+                    except Exception:
+                        expire = ""
+                    coupon_detail_list.append({
+                        "面值": price,
+                        "门槛": condition,
+                        "有效期": expire
+                    })
                 print("【检测到优惠券】此商品有优惠券可用！！！")
+                return True, coupon_detail_list
             else:
                 print("【未检测到优惠券】此商品暂无优惠券")
-                
-            return has_coupon
+                return False, []
         except Exception as e:
             print(f"检查优惠券时出错: {e}")
-            return False
+            return False, []
 
     def get_huihui_item(self, item_id):
         huihui_info_dict = {"max_price": None, "min_price": None}
@@ -459,7 +460,7 @@ if __name__ == '__main__':
     start = time.time()
     c = Crawler()
     # c = Crawler({'http': '125.105.32.168:7305', 'https': '171.211.32.79:2456'})
-    logging.debug(c.get_jd_item('5544068'))
+    # logging.debug(c.get_jd_item('5544068'))
     # logging.debug(c.get_huihui_item('2777811'))
     end = time.time()
     print(end - start)
