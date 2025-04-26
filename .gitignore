@@ -104,3 +104,4 @@ ENV/
 PriceMonitor/mailbox.txt
 PriceMonitor/db_demo.db
 .idea/
+last_monitor_status.json

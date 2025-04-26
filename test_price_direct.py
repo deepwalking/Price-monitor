@@ -7,16 +7,49 @@ import concurrent.futures
 import os
 import pickle
 
+LAST_MONITOR_STATUS_FILE = "last_monitor_status.json"
+
+def load_monitor_status():
+    try:
+        with open(LAST_MONITOR_STATUS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            last_prices = data.get("last_prices", {})
+            last_coupon_status = data.get("last_coupon_status", {})
+            return last_prices, last_coupon_status
+    except Exception:
+        return {}, {}
+
+def save_last_prices(last_prices):
+    try:
+        data = {}
+        if os.path.exists(LAST_MONITOR_STATUS_FILE):
+            with open(LAST_MONITOR_STATUS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        data["last_prices"] = last_prices
+        with open(LAST_MONITOR_STATUS_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"保存last_prices失败: {e}")
+
+def save_last_coupon_status(last_coupon_status):
+    try:
+        data = {}
+        if os.path.exists(LAST_MONITOR_STATUS_FILE):
+            with open(LAST_MONITOR_STATUS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        data["last_coupon_status"] = last_coupon_status
+        with open(LAST_MONITOR_STATUS_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"保存last_coupon_status失败: {e}")
+
 def monitor():
     """使用已保存的 cookies 持续监控商品列表价格，每分钟获取一次，失败自动停止"""
     # 创建一个新的爬虫实例，但不加载cookies
     crawler = Crawler(skip_cookies=True)
     
     # 用于存储每个商品的上次价格，用于检测价格变化
-    last_prices = {}
-    
-    # 用于存储每个商品的上次优惠券状态，用于检测优惠券变化
-    last_coupon_status = {}
+    last_prices, last_coupon_status = load_monitor_status()
     
     cookie_file = "jd_pc_cookies.pkl"
     
@@ -101,11 +134,13 @@ def monitor():
                     # 检查优惠券状态变化（新增或内容变化才推送）
                     if (url not in last_coupon_status or
                         last_coupon_status[url]['coupon_detail_list'] != coupon_detail_list):
+                        print(f"准备推送优惠券变化通知: {url}, {title}")
                         send_jd_coupon_notice(url, title)
                         last_coupon_status[url] = {
                             'has_coupon': has_coupon,
                             'coupon_detail_list': coupon_detail_list
                         }
+                        save_last_coupon_status(last_coupon_status)
 
                 if price:
                     # 检查是否有价格变化
@@ -123,20 +158,24 @@ def monitor():
                                 change_direction = "上涨"
                             else:
                                 change_direction = "下降"
-                                
+                            # 这里可以推送价格变化通知等...
                             # 格式化status信息
                             status = f"{change_direction}，原价格：{old_price}"
-                            
-                            print(f"价格变化！{url} 价格从 {old_price} 变为 {new_price}，{status}")
+                            print(f"价格变化！{url} 价格从 {old_price} 变为 {new_price}，{status}, 准备推送价格变化通知.")
                             send_price_change_notice(url, price, title, status)
+                            
+                            last_prices[url] = price
+                            save_last_prices(last_prices)
+                        # 如果价格没变，不做处理
                     else:
                         # 第一次检测也发送通知，状态为"初始化"
                         status = f"初始采集价格：{price}"
-                        print(f"首次监控 {url}，价格: {price} 元，{status}")
+                        print(f"首次监控 {url}，价格: {price} 元，{status}, 准备推送价格变化通知.")
                         send_price_change_notice(url, price, title, status)
-                    
-                    # 更新最后检测到的价格
-                    last_prices[url] = price
+                        
+                        # 第一次监控该商品，直接记录
+                        last_prices[url] = price
+                        save_last_prices(last_prices)
                 else:
                     now = datetime.datetime.now()
                     now_str = now.strftime("%Y-%m-%d %H:%M:%S")
@@ -268,6 +307,8 @@ if __name__ == "__main__":
                 input("\n按回车键返回主菜单...")
                 
             elif choice == "2":
+                # 监控价格
+                last_prices, last_coupon_status = load_monitor_status()
                 try:
                     monitor()
                 except KeyboardInterrupt:

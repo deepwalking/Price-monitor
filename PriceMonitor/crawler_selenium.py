@@ -106,7 +106,7 @@ class Crawler(object):
         self._chrome.implicitly_wait(5)
         
         # 设置cookies文件
-        self.cookies_file = cookies_file or 'jd_cookies.pkl'
+        self.cookies_file = cookies_file or 'jd_pc_cookies.pkl'
         
         # 如果没有跳过加载cookies，则尝试加载
         if not skip_cookies:
