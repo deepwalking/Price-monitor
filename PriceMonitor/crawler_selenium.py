@@ -281,7 +281,7 @@ class Crawler(object):
             print("点击操作完成，继续获取价格")
             
             main_price_xpaths = [
-                "//span[contains(@class,'price') and not(contains(@class,'plus'))]"
+                "//span[contains(@class,'p-price')]/span[contains(@class,'price')]"
             ]
             main_price = None
             for xpath in main_price_xpaths:
@@ -297,18 +297,14 @@ class Crawler(object):
                     break
 
             item_info_dict = {'title': self.chrome.title, 'price': main_price}
+            
+            # 价格找到后，再次检查是否有优惠券（以防点击"更多"按钮后有变化）
+            print("\n--- 检查优惠券状态 ---")
             try:
-                WebDriverWait(self.chrome, 10).until(
-                    EC.presence_of_element_located((By.CLASS_NAME, "sku-name"))
-                )
-                
-                # 价格找到后，再次检查是否有优惠券（以防点击"更多"按钮后有变化）
-                print("\n--- 检查优惠券状态（价格获取后） ---")
                 item_info_dict['has_coupon'], coupon_detail_list = self.check_has_coupon()
                 item_info_dict['coupon_detail_list'] = coupon_detail_list
                 if item_info_dict['has_coupon']:
                     print(f"优惠券详细信息：{coupon_detail_list}")
-                
             except TimeoutException:
                 print("等待商品信息加载超时")
         except Exception as e:

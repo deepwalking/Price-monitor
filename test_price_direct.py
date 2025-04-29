@@ -129,9 +129,11 @@ def monitor():
                 title = item_info['title']
                 if title == "" or title is None:
                     print(f"\n商品 {url} 未找到标题，跳过")
+                    send_jd_exception_notice("商品 {url} 标题未找到")
                     continue
                 if price == "" or price is None:
                     print(f"\n商品 {url} 未找到价格，跳过")
+                    send_jd_exception_notice("商品 {url} 价格未找到")
                     continue
                 has_coupon = item_info['has_coupon']
                 coupon_detail_list = item_info['coupon_detail_list']
@@ -302,7 +304,7 @@ def send_jd_exception_notice(exceiption):
         
         import requests
         api_url = "https://api.azzjia.com/common/SendJdExceptionNotice"
-        response = requests.post(api_url, json=payload, timeout=5)
+        # response = requests.post(api_url, json=payload, timeout=5)
         print(f"发送异常通知发送结果: {response.status_code}")
             
     except Exception as e:
