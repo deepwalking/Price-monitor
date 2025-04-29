@@ -191,7 +191,8 @@ def monitor():
             except Exception as e:
                 now = datetime.datetime.now()
                 now_str = now.strftime("%Y-%m-%d %H:%M:%S")
-                print(f"[{now_str}] {url} 获取价格失败，跳过: {e}")
+                print(f"[{now_str}] {url} 获取商品信息异常，跳过: {e}")
+                send_jd_exception_notice(f"{now_str}, {url}, 获取商品信息异常: {e}")
                 continue
         time.sleep(interval)
 
@@ -259,7 +260,7 @@ def send_jd_price_change_notice(url, price, title, status):
         
         import requests
         api_url = "https://api.azzjia.com/common/SendJdPriceChangeNotice"
-        # response = requests.post(api_url, json=payload, timeout=5)
+        response = requests.post(api_url, json=payload, timeout=5)
         print(f"价格变化通知发送结果: {response.status_code}")
             
     except Exception as e:
@@ -287,7 +288,7 @@ def send_jd_coupon_notice(url, title):
         
         import requests
         api_url = "https://api.azzjia.com/common/SendJdCouponNotice"
-        # response = requests.post(api_url, json=payload, timeout=5)
+        response = requests.post(api_url, json=payload, timeout=5)
         print(f"发送优惠券通知发送结果: {response.status_code}")
             
     except Exception as e:
@@ -304,7 +305,7 @@ def send_jd_exception_notice(exceiption):
         
         import requests
         api_url = "https://api.azzjia.com/common/SendJdExceptionNotice"
-        # response = requests.post(api_url, json=payload, timeout=5)
+        response = requests.post(api_url, json=payload, timeout=5)
         print(f"发送异常通知发送结果: {response.status_code}")
             
     except Exception as e:
