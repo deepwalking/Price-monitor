@@ -126,7 +126,13 @@ def monitor():
                 print(f"\n正在访问商品: {url}")
                 item_info = crawler.get_jd_item(url)
                 price = item_info['price']
-                title = item_info['name']
+                title = item_info['title']
+                if title == "" or title is None:
+                    print(f"\n商品 {url} 未找到标题，跳过")
+                    continue
+                if price == "" or price is None:
+                    print(f"\n商品 {url} 未找到价格，跳过")
+                    continue
                 has_coupon = item_info['has_coupon']
                 coupon_detail_list = item_info['coupon_detail_list']
                 
@@ -251,7 +257,7 @@ def send_jd_price_change_notice(url, price, title, status):
         
         import requests
         api_url = "https://api.azzjia.com/common/SendJdPriceChangeNotice"
-        response = requests.post(api_url, json=payload, timeout=5)
+        # response = requests.post(api_url, json=payload, timeout=5)
         print(f"价格变化通知发送结果: {response.status_code}")
             
     except Exception as e:
@@ -279,7 +285,7 @@ def send_jd_coupon_notice(url, title):
         
         import requests
         api_url = "https://api.azzjia.com/common/SendJdCouponNotice"
-        response = requests.post(api_url, json=payload, timeout=5)
+        # response = requests.post(api_url, json=payload, timeout=5)
         print(f"发送优惠券通知发送结果: {response.status_code}")
             
     except Exception as e:

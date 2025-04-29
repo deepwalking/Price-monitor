@@ -247,7 +247,7 @@ class Crawler(object):
         item: 可以是商品ID（如 '100038005189'）或完整URL（如 'https://item.jd.com/100038005189.html'）
         """
         import re
-        item_info_dict = {"name": None, "price": None, "plus_price": None, "subtitle": None, "has_coupon": None, "coupon_detail_list": None}
+        item_info_dict = {"title": None, "price": None, "has_coupon": None, "coupon_detail_list": None}
         original_url = None
         # 彻底防止重复拼接
         if isinstance(item, str) and item.strip().startswith("http"):
@@ -281,10 +281,6 @@ class Crawler(object):
             print("点击操作完成，继续获取价格")
             
             main_price_xpaths = [
-                "//span[@class='price J-p-']",  # 典型主售价
-                "//span[@id='jd-price']",
-                "//div[contains(@class,'p-price')]//span[contains(@class,'price')]",
-                "//span[@class='p-price']/span",
                 "//span[contains(@class,'price') and not(contains(@class,'plus'))]"
             ]
             main_price = None
@@ -299,27 +295,12 @@ class Crawler(object):
                             break
                 if main_price:
                     break
-            if not main_price:
-                price_spans = self.chrome.find_elements(By.XPATH, "//span[contains(@class,'price') or contains(@class,'p-price') or contains(@class,'jd-price') or contains(@class,'price J-p-') or @id='jd-price']")
-                print(f"共找到 {len(price_spans)} 个价格相关元素:")
-                for idx, ele in enumerate(price_spans):
-                    print(f"[{idx}] class: {ele.get_attribute('class')}, id: {ele.get_attribute('id')}, 文本: {ele.text}")
-                price_candidates = []
-                for ele in price_spans:
-                    text = ele.text.strip().replace("￥", "").replace(",", "")
-                    if text and text.replace('.', '', 1).isdigit():
-                        price_candidates.append(float(text))
-                if price_candidates:
-                    main_price = str(max(price_candidates))
-                    print(f"降级选择最大价格作为主售价: {main_price}")
-            item_info_dict = {'name': '', 'price': main_price, 'plus_price': None, 'subtitle': None}
+
+            item_info_dict = {'title': self.chrome.title, 'price': main_price}
             try:
                 WebDriverWait(self.chrome, 10).until(
                     EC.presence_of_element_located((By.CLASS_NAME, "sku-name"))
                 )
-                self.chrome.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
-                time.sleep(1)
-                self._extract_item_info(item_info_dict)
                 
                 # 价格找到后，再次检查是否有优惠券（以防点击"更多"按钮后有变化）
                 print("\n--- 检查优惠券状态（价格获取后） ---")
@@ -339,54 +320,6 @@ class Crawler(object):
             logging.info('Crawl finished')
         return item_info_dict
 
-    def _extract_item_info(self, item_info_dict):
-        """提取商品信息的内部方法"""
-        # 提取商品名称
-        try:
-            selectors = [
-                "//div[@class='sku-name']",
-                "//div[contains(@class, 'item-name')]",
-                "//div[contains(@class, 'product-intro')]//div[@class='name']"
-            ]
-            for selector in selectors:
-                element = self._find_element_safe(By.XPATH, selector)
-                if element and element.text:
-                    item_info_dict['name'] = element.text
-                    break
-        except Exception as e:
-            logging.warning('Crawl name failure: {}'.format(e))
-
-        # 提取商品PLUS价格
-        try:
-            selectors = [
-                "//div[@class='p-price-plus']//span[@class='price']",
-                "//span[contains(@class, 'plus-price')]"
-            ]
-            for selector in selectors:
-                element = self._find_element_safe(By.XPATH, selector)
-                if element and element.text:
-                    plus_price = element.text
-                    plus_price_xpath = re.findall(r'-?\d+\.?\d*e?-?\d*?', plus_price)
-                    if plus_price_xpath:
-                        item_info_dict['plus_price'] = plus_price_xpath[0]
-                        break
-        except Exception as e:
-            logging.warning('Crawl plus_price failure: {}'.format(e))
-
-        # 提取商品副标题
-        try:
-            selectors = [
-                "//div[@id='p-ad']",
-                "//div[@class='sku-desc']",
-                "//div[contains(@class, 'sku-subtitle')]"
-            ]
-            for selector in selectors:
-                element = self._find_element_safe(By.XPATH, selector)
-                if element and element.text:
-                    item_info_dict['subtitle'] = element.text
-                    break
-        except Exception as e:
-            logging.warning('Crawl subtitle failure: {}'.format(e))
             
     def _click_more_button(self):
         """尝试点击页面上的'更多'按钮，弹出右侧界面"""

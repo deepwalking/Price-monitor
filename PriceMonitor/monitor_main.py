@@ -40,8 +40,7 @@ class Entrance(object):
                 if item_info:
                     sq.update_item_name(column_id, item_info['name'])
                     sq.update_item_price(column_id, item_info['price'])
-                    sq.update_item_plus_price(column_id, item_info['plus_price'])
-                    sq.update_item_subtitle(column_id, item_info['subtitle'])
+                    # sq.update_item_plus_price(column_id, item_info['plus_price'])  # 已移除plus_price字段
                     cr = Crawler(proxy_info[1])
                     huihui_info = cr.get_huihui_item(item_id)
                     if huihui_info:
@@ -65,8 +64,7 @@ class Entrance(object):
                 else:
                     sq.update_item_name(column_id, item_info['name'])
                     sq.update_item_price(column_id, item_info['price'])
-                    sq.update_item_plus_price(column_id, item_info['plus_price'])
-                    sq.update_item_subtitle(column_id, item_info['subtitle'])
+                    # sq.update_item_plus_price(column_id, item_info['plus_price'])  # 已移除plus_price字段
                     cr = Crawler(self.proxy_info_zhima[1])
                     huihui_info = cr.get_huihui_item(item_id)
                     if huihui_info:
@@ -80,8 +78,7 @@ class Entrance(object):
             item_info = cr.get_jd_item(item_id)
             sq.update_item_name(column_id, item_info['name'])
             sq.update_item_price(column_id, item_info['price'])
-            sq.update_item_plus_price(column_id, item_info['plus_price'])
-            sq.update_item_subtitle(column_id, item_info['subtitle'])
+            # sq.update_item_plus_price(column_id, item_info['plus_price'])  # 已移除plus_price字段
 
             cr = Crawler()
             # huihui_info = {max_price, min_price}
