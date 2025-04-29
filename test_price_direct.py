@@ -162,7 +162,7 @@ def monitor():
                             # 格式化status信息
                             status = f"{change_direction}，原价格：{old_price}"
                             print(f"价格变化！{url} 价格从 {old_price} 变为 {new_price}，{status}, 准备推送价格变化通知.")
-                            send_price_change_notice(url, price, title, status)
+                            send_jd_price_change_notice(url, price, title, status)
                             
                             last_prices[url] = price
                             save_last_prices(last_prices)
@@ -171,7 +171,7 @@ def monitor():
                         # 第一次检测也发送通知，状态为"初始化"
                         status = f"初始采集价格：{price}"
                         print(f"首次监控 {url}，价格: {price} 元，{status}, 准备推送价格变化通知.")
-                        send_price_change_notice(url, price, title, status)
+                        send_jd_price_change_notice(url, price, title, status)
                         
                         # 第一次监控该商品，直接记录
                         last_prices[url] = price
@@ -228,7 +228,7 @@ def wait_for_login():
         return False
 
 
-def send_price_change_notice(url, price, title, status):
+def send_jd_price_change_notice(url, price, title, status):
     try:
         import re
         match = re.search(r'/(\d+)\.html', url)
@@ -285,6 +285,22 @@ def send_jd_coupon_notice(url, title):
     except Exception as e:
         print(f"处理优惠券变化通知时出错: {e}")
 
+
+def send_jd_exception_notice(exceiption):
+    try:
+        payload = {
+            "exception": exceiption,
+        }
+        
+        print(f"发送异常通知: 异常类型: {exceiption}")
+        
+        import requests
+        api_url = "https://api.azzjia.com/common/SendJdExceptionNotice"
+        response = requests.post(api_url, json=payload, timeout=5)
+        print(f"发送异常通知发送结果: {response.status_code}")
+            
+    except Exception as e:
+        print(f"处理异常通知时出错: {e}")
 
 if __name__ == "__main__":
     crawler = None
